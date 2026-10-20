@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+
+from yeti_voice.daemon import main as daemon_main
+from yeti_voice.dsp import build_filter_chain
+from yeti_voice.model import (
+    apply_profile,
+    delete_profile,
+    list_profiles,
+    load_config,
+    profile_settings,
+    save_config,
+    save_profile,
+)
+from yeti_voice.system import diagnostics, set_hardware_percent
+from yeti_voice.tui import main as tui_main
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Controle Blue VO!CE para o Yeti Nano no Linux")
+    parser.add_argument("--daemon", action="store_true", help="executa o engine em primeiro plano")
+    parser.add_argument("--diagnose", action="store_true", help="mostra diagnóstico em JSON")
+    parser.add_argument("--print-chain", action="store_true", help="mostra a cadeia FFmpeg")
+    commands = parser.add_subparsers(dest="command")
+    profile = commands.add_parser("profile", aliases=["perfil"], help="gerencia perfis de áudio")
+    profile_commands = profile.add_subparsers(dest="profile_command", required=True)
+    list_command = profile_commands.add_parser("list", aliases=["listar"], help="lista os perfis")
+    list_command.add_argument("--json", action="store_true", help="saída em JSON")
+    apply_command = profile_commands.add_parser("apply", aliases=["aplicar"], help="aplica um perfil")
+    apply_command.add_argument("name", help="nome do perfil")
+    save_command = profile_commands.add_parser("save", aliases=["salvar"], help="salva os ajustes atuais")
+    save_command.add_argument("name", help="nome do novo perfil")
+    save_command.add_argument("--description", "--descricao", default="Perfil personalizado")
+    delete_command = profile_commands.add_parser("delete", aliases=["excluir"], help="exclui um perfil personalizado")
+    delete_command.add_argument("name", help="nome do perfil")
+    show_command = profile_commands.add_parser("show", aliases=["mostrar"], help="exibe um perfil em JSON")
+    show_command.add_argument("name", help="nome do perfil")
+    args = parser.parse_args()
+    if args.daemon:
+        return daemon_main()
+    if args.diagnose:
+        print(json.dumps(diagnostics(), indent=2, ensure_ascii=False))
+        return 0
+    if args.print_chain:
+        print(build_filter_chain(load_config()))
+        return 0
+    if args.command in ("profile", "perfil"):
+        try:
+            if args.profile_command in ("list", "listar"):
+                profiles = list_profiles()
+                if args.json:
+                    print(json.dumps(profiles, indent=2, ensure_ascii=False))
+                else:
+                    for item in profiles:
+                        marker = "*" if item["active"] else " "
+                        modified = " (modificado)" if item["modified"] else ""
+                        origin = "fábrica" if item["builtin"] else "usuário"
+                        print(f"{marker} {item['name']:<16} [{origin}] {item['description']}{modified}")
+                return 0
+            if args.profile_command in ("apply", "aplicar"):
+                settings = apply_profile(args.name)
+                for kind, key in (("gain", "hardware_gain"), ("headphone", "headphone_volume")):
+                    set_hardware_percent(kind, int(settings[key]))
+                print(f"Perfil aplicado: {settings['active_profile']}")
+                return 0
+            if args.profile_command in ("save", "salvar"):
+                settings = load_config()
+                name = save_profile(args.name, settings, args.description)
+                settings["active_profile"] = name
+                settings["profile_modified"] = False
+                save_config(settings)
+                print(f"Perfil salvo: {name}")
+                return 0
+            if args.profile_command in ("delete", "excluir"):
+                name = delete_profile(args.name)
+                print(f"Perfil excluído: {name}")
+                return 0
+            if args.profile_command in ("show", "mostrar"):
+                print(json.dumps(profile_settings(args.name), indent=2, ensure_ascii=False))
+                return 0
+        except KeyError as error:
+            print(f"Perfil não encontrado: {error.args[0]}", file=sys.stderr)
+            return 1
+        except ValueError as error:
+            print(f"Erro: {error}", file=sys.stderr)
+            return 1
+    return tui_main()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

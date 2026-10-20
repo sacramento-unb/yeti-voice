@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "vitor.yeti-voice",
+  "name": "Yeti Voice",
+  "version": "1.0.0",
+  "author": "Vitor",
+  "license": "MIT",
+  "description": "Open the Blue Yeti Nano voice controls from the Omarchy bar.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Yeti Voice",
+    "description": "Open the Yeti Nano controls in a floating terminal.",
+    "category": "Audio",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {},
+    "schema": []
+  }
+}

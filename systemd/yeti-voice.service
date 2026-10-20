@@ -1,0 +1,15 @@
+[Unit]
+Description=Yeti Voice Blue VO!CE-compatible audio engine
+After=pipewire-pulse.service wireplumber.service
+Wants=pipewire-pulse.service wireplumber.service
+
+[Service]
+Type=simple
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=%h/.local/share/yeti-voice
+ExecStart=/usr/bin/python -m yeti_voice.daemon
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
